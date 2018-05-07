@@ -1,0 +1,292 @@
+    <h3> 1. Install ROS </h3>
+    follow instructions on wiki ROS tutorial.
+
+    <h3> 2. Create WorkSpace </h3>
+
+    <p><code>mkdir -p ~/catkin_ws/src</code>  creates src folder inside workspace folder</p>
+    <p><code>cd ~/catkin_ws/src</code>  change directory to src folder</p>
+    <p><code>catkin_init_workspace</code>  creates symlink (pointing to the topLevel CMake). creates CMakeLists in src folder</p>
+    <p><code>cd ~/catkin_ws/</code>  change directory to workspace folder</p>
+    <p><code>source /opt/ros/indigo/setup.bash</code>  This command executes the bash script 'opt/ros/indigo/setup.bash' which sets the envrionment variables needed for the ros command line tools to work and means the packages installed with ros can be found.</p>
+    <p><code>catkin_make</code>  always exectue command in the workspace folder. creates build folder and devel folder with files inside</p>
+    <p><code>source devel/setup.bash</code>  this executed the bash script 'devel/setup.bash' within the current working directory. This adds the paths for this package to the ros envrionment variables so you can find and execute the assets of packages in this workspace, for example with rosrun or roslaunch.</p>
+    <p><code>echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc</code>  This command appends the line 'source ~/catkin_ws/devel/setup.bash' to the end of the .bashrc file in your home folder. Why would you want to do this you ask, well the .bashrc file is another bash script that is automatically run every time you start a new terminal. So by adding this line the environment variables will automatically setup to use the packages in the catkin_ws workspace every time you open a new terminal.</p>
+
+    <h3>3. Create Package</h3>
+    <p><code>cd ~/catkin_ws/src</code>  change directory to src folder, where package folder must be created</p>
+    <p><code>catkin_create_pkg my_pkg roscpp</code>  name the package and specify dependency. this creates the package folder. inside it, include folder, src folder, CMakeLists file and package file are created</p>
+
+    <h3>4. Add the code</h3>
+    <p> add code inside the src folder inside the package folder. save as hello.cpp</p>
+    #include <ros/ros.h>
+
+    int main(int argc, char** argv){
+    ros::init(argc, argv, "hello_ros");
+    ros::NodeHandle nh;
+    ROS_INFO_STREAM("Hello, ROS!");
+    }
+
+    <h3>5. Fix the CMakeLists inside the package folder</h3>
+
+    cmake_minimum_required(VERSION 2.8.3)
+    project(book_pkg)
+
+    find_package(catkin REQUIRED COMPONENTS   roscpp  )
+
+    catkin_package( )
+
+    include_directories( include  ${catkin_INCLUDE_DIRS})
+
+    add_executable(hello src/hello.cpp)
+    target_link_libraries(hello ${catkin_LIBRARIES})
+
+    <h3>6. Build and run (run the package that is)</h3>
+    <p><code>cd ~/catkin_ws</code> back to workspace folder </p>
+    <p><code>catkin_make</code> catkin specific command to build and make package </p>
+    <p> once build is successful, open new terminal, type: <code> roscore </code> open another terminal, type: <code> rosrun my_pkg hello </code> </p>
+
+$rosmsg show geometry_msgs/Twist
+'{linear: {x: 0.1, y: 0, z: 0}, angular: {x: 0, y: 0, z: 0}}'
+
+sudo apt-get install ros-indigo-rosserial-arduino
+sudo apt-get install ros-indigo-rosserial
+
+Arduino/library/rosrun rosserial_arduino make_libraries.py .
+
+
+/*
+ * Test with many publishers and subscribers
+ *
+ * This example works on arduino uno if the ros_lib is created with use of PROGMEM,
+ *   i. e. without any changed to the application code at least topic types and md5sum
+ *   are stored in flash memory and not in SRAM for the entire application lifetime
+ *
+ * If the ros_lib is created without use of flash menory this will compile but all the 
+ * 	msg's tyes and md5sums will use up all the SRAM on Arduino uno and this 
+ * 	will fail to run on arduino uno
+ * 
+ */
+
+#include <ros.h>
+#include <ros/time.h>
+#include <sensor_msgs/Range.h>
+#include <geometry_msgs/Twist.h>
+#include <Wire.h>
+#include <LSM303.h>
+LSM303 compass;
+
+
+ros::NodeHandle  nh;
+
+//sensor_msgs::Range us_range_msg;
+//sensor_msgs::Range ira_range_msg;
+//sensor_msgs::Range irb_range_msg;
+//sensor_msgs::Range comp_range_msg;
+sensor_msgs::Range range_msg;
+geometry_msgs::Twist msg;
+
+
+//ros::Publisher chatter_us("chatter_us_msg", &us_range_msg);
+//ros::Publisher chatter_ira("chatter_ira_msg", &ira_range_msg);
+//ros::Publisher chatter_irb("chatter_irb_msg", &irb_range_msg);
+//ros::Publisher chatter_comp("chatter_comp_msg", &comp_range_msg);
+
+ros::Publisher chatter_us("chatter_us_msg", &range_msg);
+ros::Publisher chatter_ira("chatter_ira_msg", &range_msg);
+ros::Publisher chatter_irb("chatter_irb_msg", &range_msg);
+ros::Publisher chatter_comp("chatter_comp_msg", &range_msg);
+
+int linear;
+int angular;
+
+//char ira_frameid[] = "/ira_ranger";
+//char irb_frameid[] = "/irb_ranger";
+//char us_frameid[] = "/ultrasound";
+//char comp_frameid[] = "/compass";
+
+char frameid[] = "/ranger";
+
+// defines pins numbers
+const int trigPin = 10;
+const int echoPin = 11;
+const int pha     = 6;
+const int ena     = 7;
+const int phb     = 9;
+const int enb     = 8;
+const int analog_IR_1 = A1;
+const int analog_IR_2 = A2;
+
+// defines variables
+
+float getRange_Ultrasound(){
+  unsigned long duration = 0;
+  unsigned long distance = 0;
+  unsigned long duration_temp = 0;
+  long range = 0;
+  long cm = 0;
+
+  // The sensor is triggered by a HIGH pulse of 10 or more microseconds.    // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+ 
+  // Read the signal from the sensor: a HIGH pulse whose    // duration is the time (in microseconds) from the sending    // of the ping to the reception of its echo off of an object.
+  pinMode(echoPin, INPUT);
+  duration = pulseIn(echoPin, HIGH);
+
+  // convert the time into a distance
+  cm = (duration/2) / 29.1;
+  return cm; 
+}
+
+float getRange_Infrared(int pin_num){
+  return analogRead(pin_num);
+}
+
+float getRange_Compass(){
+  unsigned int heading = 0;
+  
+  compass.read();
+    
+  for(int i = 0; i < 32; i ++){
+    heading += (unsigned int)compass.heading();
+  }
+  heading = heading >> 5; 
+
+  return (float)heading; 
+}
+
+void messageCbTwist( const geometry_msgs::Twist& cmd_vel){
+
+  linear = (int)cmd_vel.linear.x;
+  angular = (int)cmd_vel.angular.z ;
+
+ if(linear == 2)  { //forward
+    digitalWrite(pha, LOW);
+    digitalWrite(ena, HIGH);
+    digitalWrite(phb, LOW);
+    digitalWrite(enb, HIGH);
+ }else if(linear == -2) { //reverse
+    digitalWrite(pha, HIGH);
+    digitalWrite(ena, LOW);
+    digitalWrite(phb, HIGH);
+    digitalWrite(enb, LOW);  
+ }else if(angular == 2) { //right
+    digitalWrite(pha, HIGH);
+    digitalWrite(ena, LOW);
+    digitalWrite(phb, LOW);
+    digitalWrite(enb, HIGH);    
+ }else if(angular == -2) { //left
+    digitalWrite(pha, LOW);
+    digitalWrite(ena, HIGH);
+    digitalWrite(phb, HIGH);
+    digitalWrite(enb, LOW);
+ }else{                     //brake
+    digitalWrite(pha, HIGH);
+    digitalWrite(ena, HIGH);
+    digitalWrite(phb, HIGH);
+    digitalWrite(enb, HIGH);
+ }
+
+  nh.spinOnce();
+  
+}
+
+ros::Subscriber<geometry_msgs::Twist> sub("robot/cmd_vel", &messageCbTwist );
+
+void setup()
+{
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
+  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
+  
+  pinMode(pha, OUTPUT); // Sets the phaseA as an Output
+  pinMode(ena, OUTPUT); // Sets the enableA as an Output
+  pinMode(phb, OUTPUT); // Sets the phaseB as an Output
+  pinMode(enb, OUTPUT); // Sets the enableB as an Output
+  
+  Serial.begin(9600); // Starts the serial communication
+  Wire.begin();
+  compass.init();
+  compass.enableDefault();
+  
+  /*
+  Calibration values; the default values of +/-32767 for each axis
+  lead to an assumed magnetometer bias of 0. Use the Calibrate example
+  program to determine appropriate values for your particular unit.
+  */
+  compass.m_min = (LSM303::vector<int16_t>){-32767, -32767, -32767};
+  compass.m_max = (LSM303::vector<int16_t>){+32767, +32767, +32767};
+  
+//  ultraSonic
+    us_range_msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
+    us_range_msg.header.frame_id =  us_frameid;
+    us_range_msg.field_of_view = 0.1;  // fake
+    us_range_msg.min_range = 1.0;
+    us_range_msg.max_range = 30.0;
+    
+//  ira
+    ira_range_msg.radiation_type = sensor_msgs::Range::INFRARED;
+    ira_range_msg.header.frame_id =  ira_frameid;
+    ira_range_msg.field_of_view = 0.01;
+    ira_range_msg.min_range = 1.0;
+    ira_range_msg.max_range = 10.0;    
+
+//  irb
+    irb_range_msg.radiation_type = sensor_msgs::Range::INFRARED;
+    irb_range_msg.header.frame_id =  irb_frameid;
+    irb_range_msg.field_of_view = 0.01;
+    irb_range_msg.min_range = 1.0;
+    irb_range_msg.max_range = 10.0;  
+
+//  compass
+//    comp_range_msg.radiation_type = sensor_msgs::Range::INFRARED; //compass
+//    comp_range_msg.header.frame_id = comp_frameid;
+//    comp_range_msg.field_of_view = 0.01;
+//    comp_range_msg.min_range = 1.0;
+//    comp_range_msg.max_range = 10.0;  
+    
+    nh.initNode();
+    nh.advertise(chatter_us);
+    nh.advertise(chatter_ira);
+    nh.advertise(chatter_irb);
+//    nh.advertise(chatter_comp);
+    
+    nh.subscribe( sub );
+
+  
+}
+
+void loop()
+{  
+//  us_sensor    
+    us_range_msg.range = getRange_Ultrasound();
+    us_range_msg.header.stamp = nh.now();
+    chatter_us.publish(&us_range_msg);  
+
+//  ira_sensor
+    ira_range_msg.range = getRange_Infrared(analog_IR_1);
+    ira_range_msg.header.stamp = nh.now();
+    chatter_ira.publish(&ira_range_msg);  
+
+//  irb_sensor
+    irb_range_msg.range = getRange_Infrared(analog_IR_2);
+    irb_range_msg.header.stamp = nh.now();
+    chatter_irb.publish(&irb_range_msg);  
+
+//  comp_sensor
+//    comp_range_msg.range = getRange_Compass();
+//    comp_range_msg.header.stamp = nh.now();
+//    chatter_comp.publish(&comp_range_msg);  
+  
+    nh.spinOnce();
+
+//    Prints the distance on the Serial Monitor
+//    Serial.print("Distance: ");
+//    Serial.print(getRange_Ultrasound());
+//    Serial.print(" IR: ");
+//    Serial.print(analogRead(analog_IR_1));
+//    Serial.print(" IR: ");
+//    Serial.println(analogRead(analog_IR_2));
+}
